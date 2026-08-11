@@ -84,8 +84,10 @@
         <div class="progress" id="progress-text"></div>
         <div id="emoji-display" class="emoji-display hidden"></div>
         <div class="question-text" id="question-text"></div>
+	<!-- ↓↓ ここに発音ボタンを追加 ↓↓ -->
+        <button id="btn-speak" style="background-color: #f39c12; color: white; border: none; padding: 8px 15px; border-radius: 20px; font-size: 0.9rem; cursor: pointer; margin-bottom: 15px;">🔊 問題文を聞く</button>
+        <!-- ↑↑ 追加ここまで ↑↑ -->
         <div id="options-container"></div>
-        
         <div id="feedback">
             <div id="feedback-title"></div>
             <div id="feedback-text"></div>
@@ -341,6 +343,7 @@ const emojiQuizData = [
         nextBtn: document.getElementById('next-btn'), restartBtn: document.getElementById('restart-btn'),
         progressText: document.getElementById('progress-text'), emojiDisplay: document.getElementById('emoji-display'),
         questionText: document.getElementById('question-text'), optionsContainer: document.getElementById('options-container'),
+	btnSpeak: document.getElementById('btn-speak'),
         feedback: document.getElementById('feedback'), feedbackTitle: document.getElementById('feedback-title'),
         feedbackText: document.getElementById('feedback-text'), scoreText: document.getElementById('score-text'),
         resultMessage: document.getElementById('result-message'), historyList: document.getElementById('history-list')
@@ -388,6 +391,39 @@ const emojiQuizData = [
         }
     });
 
+
+    // --- 発音機能（Web Speech API） ---
+    ui.btnSpeak.addEventListener('click', () => {
+        const q = currentSessionData[currentQuestionIndex];
+        let textToSpeak = "";
+        
+        if (q.emoji) {
+            textToSpeak = q.options[q.answer].split(' ')[0]; 
+        } else {
+            textToSpeak = q.question.split('\n')[0];
+            
+            // 読み上げを自然にするための調整
+            textToSpeak = textToSpeak.replace('（ ）', '、、、');
+            textToSpeak = textToSpeak.replace(/「|」/g, ''); 
+            
+            // ↓↓ 読み間違いを修正する辞書（順番が大事！） ↓↓
+            
+            // 1. まず「10時」などの時刻を先にひらがなに変換して保護する
+            textToSpeak = textToSpeak.replace(/10時/g, 'じゅうじ');
+            
+            // 2. その上で、残っている「時」をすべて「とき」に変換する
+            textToSpeak = textToSpeak.replace(/時/g, 'とき');
+        }
+
+        const utterance = new SpeechSynthesisUtterance(textToSpeak);
+        utterance.lang = 'ja-JP'; 
+        utterance.rate = 0.85; 
+        
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+    });
+
+
     // --- クイズロジック ---
     function startQuiz(sourceData, name) {
         // 1. ラジオボタンから選択された出題数を取得
@@ -421,12 +457,18 @@ const emojiQuizData = [
         const q = currentSessionData[currentQuestionIndex];
         ui.progressText.innerText = `【${currentQuizName}】 問題 ${currentQuestionIndex + 1} / ${currentSessionData.length}`;
         
+        // ▼▼ ここから追加・修正 ▼▼
         if (q.emoji) {
             ui.emojiDisplay.innerText = q.emoji;
             ui.emojiDisplay.classList.remove('hidden');
+            // 絵文字コースの時は「回答を聞く」に変更
+            ui.btnSpeak.innerText = "🔊 回答を聞く";
         } else {
             ui.emojiDisplay.classList.add('hidden');
+            // 文法コースの時は「問題文を聞く」に変更
+            ui.btnSpeak.innerText = "🔊 問題文を聞く";
         }
+        // ▲▲ ここまで ▲▲
 
         ui.questionText.innerText = q.question;
         ui.optionsContainer.innerHTML = '';
