@@ -410,8 +410,9 @@ const emojiQuizData = [
             
             // 1. まず「10時」などの時刻を先にひらがなに変換して保護する
             textToSpeak = textToSpeak.replace(/10時/g, 'じゅうじ');
-            
-            // 2. その上で、残っている「時」をすべて「とき」に変換する
+			textToSpeak = textToSpeak.replace(/時間/g, 'じかん'); // ← ★この1行を追加！
+
+			// 2. その上で、残っている「時」をすべて「とき」に変換する
             textToSpeak = textToSpeak.replace(/時/g, 'とき');
         }
 
