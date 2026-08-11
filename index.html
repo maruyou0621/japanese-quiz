@@ -57,16 +57,20 @@
 <body>
 
 <div id="app">
-    <!-- 1. TOP画面 -->
+<!-- 1. TOP画面 -->
     <div id="top-screen">
         <h1>サクッと！日本語ゲーム<br><span style="font-size:1rem; color:#7f8c8d;">轻松学日语</span></h1>
         
         <!-- 出題数の選択設定 -->
-        <div class="setting-area">
-            <p>出題数を選択 / 请选择题目数量</p>
+        <div class="setting-area" style="margin: 20px 0; padding: 15px; background: #f0f4f8; border-radius: 10px;">
+            <p style="margin-bottom: 10px; font-weight: bold; color: #34495e;">出題数を選択 / 请选择题目数量</p>
             <div class="radio-group">
-                <label><input type="radio" name="q-count" value="10" checked> 10問</label>
-                <label><input type="radio" name="q-count" value="20"> 20問</label>
+                <label style="margin-right: 15px; cursor: pointer;">
+                    <input type="radio" name="q-count" value="10" checked> 10問サクッとモード
+                </label>
+                <label style="cursor: pointer;">
+                    <input type="radio" name="q-count" value="20"> 20問じっくりモード
+                </label>
             </div>
         </div>
         
@@ -78,7 +82,7 @@
             <div id="history-list"></div>
         </div>
     </div>
-
+	
     <!-- 2. クイズ画面 -->
     <div id="quiz-screen" class="hidden">
         <div class="progress" id="progress-text"></div>
@@ -666,7 +670,7 @@ const emojiQuizData = [
 
 
     // --- クイズロジック ---
-    function startQuiz(sourceData, name) {
+function startQuiz(sourceData, name) {
         // 1. ラジオボタンから選択された出題数を取得
         const countRadios = document.getElementsByName('q-count');
         let selectedCount = 10;
@@ -674,16 +678,29 @@ const emojiQuizData = [
             if (radio.checked) { selectedCount = parseInt(radio.value); break; }
         }
 
-        // 2. 配列をシャッフル（ランダム化）する処理
-        let shuffled = [...sourceData];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        // 配列をシャッフルする内部関数
+        const shuffle = (array) => array.sort(() => Math.random() - 0.5);
+
+        // 2. 問題数に応じて各レベルの配分を決定 (6:3:1の黄金比)
+        let lv1Count, lv2Count, lv3Count;
+        if (selectedCount === 20) {
+            lv1Count = 12; lv2Count = 6; lv3Count = 2; // 20問じっくり
+        } else {
+            lv1Count = 6; lv2Count = 3; lv3Count = 1;  // 10問サクッと
         }
 
-        // 3. 選択された数だけ問題を切り出す（※問題数が足りない場合は最大数にする）
-        const actualCount = Math.min(selectedCount, shuffled.length);
-        currentSessionData = shuffled.slice(0, actualCount);
+        // 3. レベル別に抽出してシャッフル（※levelがまだ未設定のものは「Lv1」として扱う安全装置付き）
+        const lv1Questions = shuffle(sourceData.filter(q => q.level === 1 || q.level === undefined));
+        const lv2Questions = shuffle(sourceData.filter(q => q.level === 2));
+        const lv3Questions = shuffle(sourceData.filter(q => q.level === 3));
+
+        // 4. 配分通りに配列を結合する
+        // （万が一問題数が足りないエラーを防ぐため、sliceで確実な数を切り出します）
+        currentSessionData = [
+            ...lv1Questions.slice(0, lv1Count),
+            ...lv2Questions.slice(0, lv2Count),
+            ...lv3Questions.slice(0, lv3Count)
+        ];
         
         currentQuizName = name;
         currentQuestionIndex = 0; 
