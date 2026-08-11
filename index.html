@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>職場の日本語クイズ</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            background-color: #f4f5f7; color: #333; margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        #app {
+            background: #fff; width: 100%; max-width: 400px; border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 20px; box-sizing: border-box; text-align: center;
+        }
+        h1 { font-size: 1.5rem; color: #2c3e50; margin-bottom: 20px; }
+        
+        /* 出題数選択エリアのスタイル */
+        .setting-area {
+            background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;
+            border: 1px solid #e9ecef;
+        }
+        .setting-area p { margin: 0 0 10px 0; font-weight: bold; font-size: 0.95rem; color: #34495e;}
+        .radio-group { display: flex; justify-content: center; gap: 20px; }
+        .radio-group label { font-size: 1rem; cursor: pointer; display: flex; align-items: center; gap: 5px;}
+        
+        .question-text { font-size: 1.1rem; margin-bottom: 20px; font-weight: bold; line-height: 1.5; }
+        .emoji-display { font-size: 3.5rem; margin: 10px 0 20px; }
+        
+        .btn {
+            display: block; width: 100%; padding: 15px; margin-bottom: 10px;
+            border: 2px solid #3498db; background-color: #fff; color: #3498db;
+            font-size: 1.1rem; border-radius: 8px; cursor: pointer; text-align: left; transition: all 0.2s;
+        }
+        .btn-menu { text-align: center; background-color: #eaf2f8; font-weight: bold; }
+        .btn:disabled { cursor: not-allowed; opacity: 0.7; }
+        .correct-btn { background-color: #2ecc71 !important; border-color: #2ecc71 !important; color: #fff !important; }
+        .wrong-btn { background-color: #e74c3c !important; border-color: #e74c3c !important; color: #fff !important; }
+        
+        #feedback { margin-top: 20px; padding: 15px; border-radius: 8px; display: none; text-align: left; }
+        #feedback.correct { background-color: #eafaf1; border-left: 5px solid #2ecc71; }
+        #feedback.wrong { background-color: #fdedec; border-left: 5px solid #e74c3c; }
+        #feedback-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 10px; }
+        #feedback-text { font-size: 0.9rem; line-height: 1.5; color: #555; }
+        
+        #next-btn, #restart-btn { background-color: #3498db; color: #fff; text-align: center; margin-top: 20px; font-weight: bold; }
+        .hidden { display: none !important; }
+        .progress { font-size: 0.9rem; color: #7f8c8d; margin-bottom: 15px; }
+        
+        #history-section { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: left; }
+        #history-section h2 { font-size: 1.1rem; color: #2c3e50; margin-bottom: 10px; }
+        .history-item { font-size: 0.9rem; padding: 8px 0; border-bottom: 1px dashed #ccc; display: flex; justify-content: space-between; }
+        .tag { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: #eee; color: #555; margin-right: 5px;}
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <!-- 1. TOP画面 -->
+    <div id="top-screen">
+        <h1>職場の日本語クイズ<br><span style="font-size:1rem; color:#7f8c8d;">轻松学日语</span></h1>
+        
+        <!-- 出題数の選択設定 -->
+        <div class="setting-area">
+            <p>出題数を選択 / 请选择题目数量</p>
+            <div class="radio-group">
+                <label><input type="radio" name="q-count" value="10" checked> 10問</label>
+                <label><input type="radio" name="q-count" value="20"> 20問</label>
+            </div>
+        </div>
+        
+        <button id="btn-start-emoji" class="btn btn-menu">🧩 イラスト(絵文字)問題</button>
+        <button id="btn-start-grammar" class="btn btn-menu">✍️ 文法・用途問題</button>
+        
+        <div id="history-section">
+            <h2>📊 あなたの学習記録 / 你的学习记录</h2>
+            <div id="history-list"></div>
+        </div>
+    </div>
+
+    <!-- 2. クイズ画面 -->
+    <div id="quiz-screen" class="hidden">
+        <div class="progress" id="progress-text"></div>
+        <div id="emoji-display" class="emoji-display hidden"></div>
+        <div class="question-text" id="question-text"></div>
+        <div id="options-container"></div>
+        
+        <div id="feedback">
+            <div id="feedback-title"></div>
+            <div id="feedback-text"></div>
+            <button id="next-btn" class="btn">次へ / 下一题</button>
+        </div>
+    </div>
+
+    <!-- 3. 結果画面 -->
+    <div id="result-screen" class="hidden">
+        <h1>結果発表 / 最终得分</h1>
+        <div class="question-text" id="score-text"></div>
+        <p id="result-message"></p>
+        <button id="restart-btn" class="btn">トップに戻る / 返回主页</button>
+    </div>
+</div>
+
+<script>
+const emojiQuizData = [
+        { emoji: "🏢", question: "この場所は？", options: ["病院", "会社", "学校"], answer: 1, explanation: "【解析】办公楼、公司是「会社（かいしゃ）」。" },
+        { emoji: "📝", question: "仕事で使うこれは？", options: ["メモ", "名刺", "パソコン"], answer: 0, explanation: "【解析】记事本、便签是「メモ」。「名刺」是名片。" },
+        { emoji: "🏢 🏃‍♂️ 💨 💦", question: "この状況は？", options: ["出張", "退勤", "遅刻"], answer: 2, explanation: "【解析】急急忙忙赶去公司，表示「遅刻（迟到）」。" },
+        { emoji: "🚄 💼", question: "この状況は？", options: ["出張", "通勤", "旅行"], answer: 0, explanation: "【解析】带着公文包坐新干线，通常表示「出張（出差）」。" },
+        { emoji: "🍱", question: "お昼に食べるこれは？", options: ["お茶", "お弁当", "お菓子"], answer: 1, explanation: "【解析】盒饭、便当在日语中叫「お弁当（おべんとう）」。" },
+        { emoji: "🙇‍♂️", question: "この動作が表す言葉は？", options: ["お疲れ様", "お詫び / 謝罪", "お願いします"], answer: 1, explanation: "【解析】深深鞠躬通常代表道歉，即「お詫び」或「謝罪」。" },
+        { emoji: "🍻", question: "仕事のあとのこれは？", options: ["会議", "面接", "飲み会"], answer: 2, explanation: "【解析】下班后的聚餐、喝酒叫「飲み会（のみかい）」。" },
+        { emoji: "💻 🏠", question: "この働き方は？", options: ["残業", "テレワーク", "有給休暇"], answer: 1, explanation: "【解析】在家里用电脑工作叫「テレワーク（远程办公）」。" },
+        { emoji: "📅", question: "仕事の予定を管理するものは？", options: ["カレンダー / スケジュール", "ファイル", "電卓"], answer: 0, explanation: "【解析】日历或日程表叫「スケジュール」或「カレンダー」。" },
+        { emoji: "📞", question: "「〇〇に出る」", options: ["電話", "会議", "会社"], answer: 0, explanation: "【解析】接电话在日语中说「電話に出る」。" },
+        { emoji: "✉️", question: "「〇〇を送信する」", options: ["荷物", "メール", "手紙"], answer: 1, explanation: "【解析】发送电子邮件是「メールを送信する」。" },
+        { emoji: "⏰ 💦", question: "時間が足りない時は？", options: ["なる早で", "ゆっくり", "いつでも"], answer: 0, explanation: "【解析】职场俗语「なる早で」是「なるべく早く」的缩写，意思是“尽快”。" },
+        { emoji: "🖨️", question: "オフィスにあるこの機械は？", options: ["冷蔵庫", "プリンター", "テレビ"], answer: 1, explanation: "【解析】打印机在日语中叫「プリンター」或者「コピー機」。" },
+        { emoji: "📎", question: "書類をまとめるこれは？", options: ["はさみ", "のり", "クリップ"], answer: 2, explanation: "【解析】回形针是「クリップ」。剪刀是「はさみ」，胶水是「のり」。" },
+        { emoji: "✂️", question: "この文房具は？", options: ["はさみ", "カッター", "ホッチキス"], answer: 0, explanation: "【解析】剪刀是「はさみ」。美工刀是「カッター」，订书机是「ホッチキス」。" },
+        { emoji: "🗑️", question: "いらない物を捨てる場所は？", options: ["ゴミ箱", "ポスト", "引き出し"], answer: 0, explanation: "【解析】垃圾桶叫「ゴミ箱（ごみばこ）」。" },
+        { emoji: "🗄️", question: "書類を保管する家具は？", options: ["デスク", "キャビネット", "ソファ"], answer: 1, explanation: "【解析】文件柜是「キャビネット」。办公桌是「デスク」。" },
+        { emoji: "🖱️", question: "パソコンの操作に使うこれは？", options: ["マウス", "マイク", "カメラ"], answer: 0, explanation: "【解析】鼠标在日语中直接叫外来语「マウス」。" },
+        { emoji: "⌨️", question: "文字を入力する機器は？", options: ["モニター", "スピーカー", "キーボード"], answer: 2, explanation: "【解析】键盘是「キーボード」。屏幕是「モニター」。" },
+        { emoji: "🔌", question: "スマホやPCに繋ぐこれは？", options: ["充電器", "イヤホン", "ルーター"], answer: 0, explanation: "【解析】充电器是「充電器（じゅうでんき）」。" },
+        { emoji: "🔋", question: "これが切れると困ります。", options: ["Wi-Fi", "バッテリー", "データ"], answer: 1, explanation: "【解析】电池、电量是「バッテリー」。" },
+        { emoji: "📋", question: "会議で使うこれは何？", options: ["バインダー", "ポスター", "ホワイトボード"], answer: 0, explanation: "【解析】带夹子的写字板/文件夹叫「バインダー」。" },
+        { emoji: "📩 ↩️", question: "メールのこの操作は？", options: ["送信", "返信", "転送"], answer: 1, explanation: "【解析】回复邮件叫「返信（へんしん）」。发送是「送信」，转发是「転送」。" },
+        { emoji: "📩 ➡️", question: "メールのこの操作は？", options: ["削除", "返信", "転送"], answer: 2, explanation: "【解析】把邮件转发给别人叫「転送（てんそう）」。" },
+        { emoji: "📁 🗑️", question: "不要なデータをどうする？", options: ["保存する", "削除する", "隠す"], answer: 1, explanation: "【解析】删除数据或文件叫「削除（さくじょ）する」。" },
+        { emoji: "💾", question: "作った資料をどうする？", options: ["保存する", "印刷する", "閉じる"], answer: 0, explanation: "【解析】保存文件叫「保存（ほぞん）する」。" },
+        { emoji: "🔄", question: "画面のこのマークの意味は？", options: ["更新", "戻る", "停止"], answer: 0, explanation: "【解析】刷新、更新画面叫「更新（こうしん）」。" },
+        { emoji: "🔍", question: "ネットで情報を探すことは？", options: ["登録", "検索", "設定"], answer: 1, explanation: "【解析】搜索信息叫「検索（けんさく）」。" },
+        { emoji: "🌐", question: "このネットワークの世界は？", options: ["インターネット", "アプリ", "パソコン"], answer: 0, explanation: "【解析】互联网叫「インターネット」或简称「ネット」。" },
+        { emoji: "🔒", question: "ログインに必要な秘密の言葉は？", options: ["アカウント", "パスワード", "アドレス"], answer: 1, explanation: "【解析】密码是「パスワード」。" },
+        { emoji: "🔇", question: "Web会議で音を消す設定は？", options: ["カメラオフ", "ミュート", "ログアウト"], answer: 1, explanation: "【解析】静音、闭麦在日语中通常叫「ミュート」。" },
+        { emoji: "📸 💻", question: "画面を画像として保存することは？", options: ["スクショ", "コピペ", "スキャン"], answer: 0, explanation: "【解析】截图是スクリーンショット，职场常简称为「スクショ」。复制粘贴简称「コピペ」。" },
+        { emoji: "🤝 📄", question: "取引先と約束を交わすことは？", options: ["面接", "契約", "挨拶"], answer: 1, explanation: "【解析】签合同、签约叫「契約（けいやく）」。" },
+        { emoji: "📅 ❌", question: "予定がなくなることは？", options: ["キャンセル", "延長", "遅刻"], answer: 0, explanation: "【解析】取消日程、预约叫「キャンセル」。" },
+        { emoji: "📅 🔄", question: "予定の日時をずらすことは？", options: ["追加", "変更", "完了"], answer: 1, explanation: "【解析】更改日程叫「変更（へんこう）」。" },
+        { emoji: "🗣️ 👂", question: "上司に意見を聞くことは？", options: ["相談", "報告", "連絡"], answer: 0, explanation: "【解析】找人商量、征求意见叫「相談（そうだん）」。常说的“报联商”就是「報告・連絡・相談」。" },
+        { emoji: "🙇‍♂️ 💦", question: "ミスをした時のこの行動は？", options: ["お礼", "謝罪", "お願い"], answer: 1, explanation: "【解析】谢罪、道歉叫「謝罪（しゃざい）」。" },
+        { emoji: "💡", question: "良い考えを思いついた！", options: ["アイデア", "ルール", "マニュアル"], answer: 0, explanation: "【解析】好点子、主意叫「アイデア」。" },
+        { emoji: "✅ 📄", question: "申請がOKされることは？", options: ["却下", "保留", "承認"], answer: 2, explanation: "【解析】申请被批准叫「承認（しょうにん）」。" },
+        { emoji: "❌ 📄", question: "申請がダメだと言われることは？", options: ["却下", "承認", "提出"], answer: 0, explanation: "【解析】申请被驳回、不批准叫「却下（きゃっか）」。" },
+        { emoji: "📈 💰", question: "会社の利益が出ている状態は？", options: ["赤字", "黒字", "無給"], answer: 1, explanation: "【解析】盈利、有利润叫「黒字（くろじ）」。" },
+        { emoji: "📉 💰", question: "会社の利益がマイナスの状態は？", options: ["赤字", "黒字", "破産"], answer: 0, explanation: "【解析】亏损叫「赤字（あかじ）」。" },
+        { emoji: "🚗 🅿️", question: "車を停める場所は？", options: ["駐輪場", "駐車場", "洗車場"], answer: 1, explanation: "【解析】停车场叫「駐車場（ちゅうしゃじょう）」。「駐輪場」是停自行车的地方。" },
+        { emoji: "🎫 🚃", question: "通勤に使うこのカードは？", options: ["定期券", "名刺", "保険証"], answer: 0, explanation: "【解析】通勤用的月票/季票叫「定期券（ていきけん）」。" },
+        { emoji: "😷 🌡️", question: "熱がある…この状態は？", options: ["二日酔い", "体調不良", "健康"], answer: 1, explanation: "【解析】身体不适、生病请假时常用「体調不良（たいちょうふりょう）」。" },
+        { emoji: "💊 💧", question: "具合が悪い時に飲むものは？", options: ["お酒", "サプリ", "薬"], answer: 2, explanation: "【解析】药是「薬（くすり）」。保健品叫「サプリ」。" },
+        { emoji: "☕", question: "仕事の合間にリラックスする時間は？", options: ["残業", "休憩", "会議"], answer: 1, explanation: "【解析】休息时间叫「休憩（きゅうけい）」。" },
+        { emoji: "🍻 🎤", question: "飲み会の後の次の予定は？", options: ["一次会", "二次会", "朝礼"], answer: 1, explanation: "【解析】聚餐后的第二场（如去唱歌等）叫「二次会（にじかい）」。" },
+        { emoji: "👔 👖", question: "夏の涼しい服装のルールは？", options: ["クールビズ", "スーツ", "制服"], answer: 0, explanation: "【解析】日本夏季推行的脱下西装外套和领带的便装制度叫「クールビズ（Cool Biz）」。" },
+        { emoji: "🏢 🔒", question: "最後に帰る人がドアの鍵を閉めることは？", options: ["戸締まり", "掃除", "消灯"], answer: 0, explanation: "【解析】锁门、确认门窗关闭叫「戸締まり（とじまり）」。关灯是「消灯」。" },
+        { emoji: "🏠 💻", question: "家で仕事をすることは？", options: ["出張", "テレワーク", "通勤"], answer: 1, explanation: "【解析】居家办公、远程办公叫「テレワーク」或「在宅（ざいたく）勤務」。" },
+        { emoji: "🏭", question: "製品を作るこの場所は？", options: ["本社", "店舗", "工場"], answer: 2, explanation: "【解析】工厂叫「工場（こうじょう）」。" },
+        { emoji: "📦 🚚", question: "商品をお客さんに届けることは？", options: ["納品", "返品", "注文"], answer: 0, explanation: "【解析】交货、送达商品叫「納品（のうひん）」。退货是「返品」。" },
+        { emoji: "🧾", question: "経費を落とすために必要な紙は？", options: ["請求書", "領収書", "見積書"], answer: 1, explanation: "【解析】收据、发票叫「領収書（りょうしゅうしょ）」，报销时必须要有。" },
+        { emoji: "💳", question: "仕事のために使ったお金は？", options: ["給料", "経費", "税金"], answer: 1, explanation: "【解析】为了工作垫付或花费的钱叫「経費（けいひ）」。" },
+        { emoji: "🕒 🏃‍♂️", question: "「〇〇に間に合わない！」", options: ["スタート", "休憩", "締め切り"], answer: 2, explanation: "【解析】截止日期、最后期限叫「締め切り（しめきり）」。" },
+// --- ここから追加分（残り44問: Q57〜Q100） ---
+        { emoji: "👔🧑‍💼", question: "会社のトップを表す言葉は？", options: ["社長", "新入社員", "お客様"], answer: 0, explanation: "【解析】总裁、总经理叫「社長（しゃちょう）」。" },
+        { emoji: "👥🗣️", question: "みんなで集まって話し合うことは？", options: ["休憩", "会議", "面接"], answer: 1, explanation: "【解析】会议是「会議（かいぎ）」。" },
+        { emoji: "💼🏃‍♂️", question: "自社の商品を売り込む仕事は？", options: ["営業", "経理", "人事"], answer: 0, explanation: "【解析】销售、跑业务叫「営業（えいぎょう）」。" },
+        { emoji: "📈💰", question: "商品が売れて得たお金は？", options: ["給料", "経費", "売上"], answer: 2, explanation: "【解析】销售额叫「売上（うりあげ）」。" },
+        { emoji: "✍️📄", question: "書類に自分の名前を書くことは？", options: ["印刷", "サイン / 署名", "削除"], answer: 1, explanation: "【解析】签字、签名叫「サイン」或「署名（しょめい）」。" },
+        { emoji: "🪪", question: "会社員であることを証明するカードは？", options: ["名刺", "社員証", "定期券"], answer: 1, explanation: "【解析】员工牌/工作证叫「社員証（しゃいんしょう）」。" },
+        { emoji: "🏢🚪", question: "お客様が最初に来る窓口は？", options: ["受付", "会議室", "食堂"], answer: 0, explanation: "【解析】前台、接待处叫「受付（うけつけ）」。" },
+        { emoji: "🛗", question: "上の階へ行く乗り物は？", options: ["階段", "エスカレーター", "エレベーター"], answer: 2, explanation: "【解析】电梯（直梯）叫「エレベーター」。" },
+        { emoji: "🚭", question: "このマークの意味は？", options: ["禁煙", "喫煙", "火気厳禁"], answer: 0, explanation: "【解析】禁止吸烟叫「禁煙（きんえん）」。" },
+        { emoji: "🚬", question: "タバコを吸っていい場所は？", options: ["休憩室", "喫煙所", "トイレ"], answer: 1, explanation: "【解析】吸烟区叫「喫煙所（きつえんじょ）」。" },
+        { emoji: "🍜🕛", question: "お昼ご飯のことは何と言う？", options: ["朝食", "昼食 / ランチ", "夕食"], answer: 1, explanation: "【解析】午餐叫「昼食（ちゅうしょく）」或「ランチ」。" },
+        { emoji: "🍻😵", question: "お酒を飲みすぎた次の日の状態は？", options: ["風邪", "寝不足", "二日酔い"], answer: 2, explanation: "【解析】宿醉叫「二日酔い（ふつかよい）」。" },
+        { emoji: "🗣️㊙️", question: "絶対に外で話してはいけない情報は？", options: ["噂話", "挨拶", "機密情報"], answer: 2, explanation: "【解析】机密信息叫「機密情報（きみつじょうほう）」。" },
+        { emoji: "🗑️📄", question: "書類を細かく裁断する機械は？", options: ["コピー機", "シュレッダー", "プリンター"], answer: 1, explanation: "【解析】碎纸机叫「シュレッダー」。" },
+        { emoji: "📦📬", question: "荷物を指定の場所へ届けるサービスは？", options: ["手紙", "宅配便", "電報"], answer: 1, explanation: "【解析】快递叫「宅配便（たくはいびん）」。" },
+        { emoji: "🏢🌱", question: "今年会社に入ったばかりの人は？", options: ["新入社員", "ベテラン", "社長"], answer: 0, explanation: "【解析】新员工叫「新入社員（しんにゅうしゃいん）」。" },
+        { emoji: "✈️🧳", question: "仕事で外国へ行くことは？", options: ["海外出張", "転勤", "留学"], answer: 0, explanation: "【解析】去国外出差叫「海外出張（かいがいしゅっちょう）」。" },
+        { emoji: "🚆🎫", question: "移動にかかったお金は？", options: ["交際費", "交通費", "宿泊費"], answer: 1, explanation: "【解析】交通费叫「交通費（こうつうひ）」。" },
+        { emoji: "💴🧾", question: "立て替えたお金を会社に請求することは？", options: ["経費精算", "予算", "税金"], answer: 0, explanation: "【解析】报销经费叫「経費精算（けいひせいさん）」。" },
+        { emoji: "💳🏦", question: "会社から毎月もらうお金は？", options: ["ボーナス", "給料", "罰金"], answer: 1, explanation: "【解析】工资、薪水叫「給料（きゅうりょう）」。" },
+        { emoji: "🎁🏢", question: "出張先で買ってきたお菓子などは？", options: ["お土産", "お弁当", "お金"], answer: 0, explanation: "【解析】特产、伴手礼叫「お土産（おみやげ）」。" },
+        { emoji: "🧑‍🏫🏢", question: "仕事のスキルを学ぶ勉強会は？", options: ["面接", "研修", "休憩"], answer: 1, explanation: "【解析】培训、进修叫「研修（けんしゅう）」。" },
+        { emoji: "📊👨‍🏫", question: "人前で企画や意見を発表することは？", options: ["プレゼン", "タイピング", "コピー"], answer: 0, explanation: "【解析】发表、做展示叫「プレゼン（Presentation的缩写）」。" },
+        { emoji: "📋✔️", question: "間違いがないか確かめることは？", options: ["確認", "削除", "無視"], answer: 0, explanation: "【解析】确认叫「確認（かくにん）」。" },
+        { emoji: "❓🙋", question: "分からないことを聞くことは？", options: ["回答", "質問", "納得"], answer: 1, explanation: "【解析】提问叫「質問（しつもん）」。" },
+        { emoji: "❌🙅", question: "相手の依頼を「できない」と言うことは？", options: ["引き受ける", "断る", "謝る"], answer: 1, explanation: "【解析】拒绝叫「断る（ことわる）」。" },
+        { emoji: "❗💡", question: "自分のアイデアを相手に出すことは？", options: ["文句", "提案", "秘密"], answer: 1, explanation: "【解析】提议、提案叫「提案（ていあん）」。" },
+        { emoji: "🥇🏆", question: "決めたゴールに到達することは？", options: ["目標達成", "赤字", "失敗"], answer: 0, explanation: "【解析】达成目标叫「目標達成（もくひょうたっせい）」。" },
+        { emoji: "😓💦", question: "仕事がたくさんあって時間がない状態は？", options: ["暇（ひま）", "忙しい（いそがしい）", "眠い"], answer: 1, explanation: "【解析】忙碌叫「忙しい（いそがしい）」。" },
+        { emoji: "🏖️🌴", question: "お給料をもらいながら休める日は？", options: ["残業", "早退", "有給休暇"], answer: 2, explanation: "【解析】带薪休假（年假）叫「有給休暇（ゆうきゅうきゅうか）」，常简称为「有給」。" },
+        { emoji: "🧯🔥", question: "火事の時に火を消す道具は？", options: ["掃除機", "消火器", "加湿器"], answer: 1, explanation: "【解析】灭火器叫「消火器（しょうかき）」。" },
+        { emoji: "🧑‍🔧🔧", question: "壊れたものを直すことは？", options: ["破壊", "開発", "修理"], answer: 2, explanation: "【解析】修理、维修叫「修理（しゅうり）」。" },
+        { emoji: "🦺👷", question: "工場や工事現場で一番大切なルールは？", options: ["安全第一", "危険", "工事中"], answer: 0, explanation: "【解析】安全第一叫「安全第一（あんぜんだいいち）」。" },
+        { emoji: "⚠️🚧", question: "気をつけて！という意味の言葉は？", options: ["安心", "注意", "歓迎"], answer: 1, explanation: "【解析】注意、小心叫「注意（ちゅうい）」。" },
+        { emoji: "🏢🤝🏢", question: "自社とビジネスをしている相手の会社は？", options: ["ライバル", "取引先", "親戚"], answer: 1, explanation: "【解析】客户、生意伙伴叫「取引先（とりひきさき）」。" },
+        { emoji: "📅⏳", question: "商品を納める期限のことは？", options: ["納期", "休暇", "誕生日"], answer: 0, explanation: "【解析】交货期、交付期限叫「納期（のうき）」。" },
+        { emoji: "💰⬇️", question: "値段が安くなることは？", options: ["値上げ", "値下げ", "無料"], answer: 1, explanation: "【解析】降价叫「値下げ（ねさげ）」。" },
+        { emoji: "💰⬆️", question: "値段が高くなることは？", options: ["値上げ", "値下げ", "半額"], answer: 0, explanation: "【解析】涨价叫「値上げ（ねあげ）」。" },
+        { emoji: "📞😠", question: "お客様からの不満や文句のことは？", options: ["注文", "クレーム（苦情）", "挨拶"], answer: 1, explanation: "【解析】投诉、抱怨叫「クレーム」或「苦情（くじょう）」。" },
+        { emoji: "📝✅", question: "社員の成績や能力を決めることは？", options: ["評価", "罰則", "注意"], answer: 0, explanation: "【解析】评价、考核叫「評価（ひょうか）」。" },
+        { emoji: "🚪🏃‍♂️", question: "仕事を終えて会社を出ることは？", options: ["出社", "退社（帰宅）", "出張"], answer: 1, explanation: "【解析】下班回家叫「退社（たいしゃ）」或「帰宅（きたく）」。" },
+        { emoji: "💼🔄", question: "部署や勤務地が変わることは？", options: ["退職", "入社", "異動"], answer: 2, explanation: "【解析】人事调动叫「異動（いどう）」。" },
+        { emoji: "🏢👋", question: "会社を辞めることは？", options: ["退職", "昇進", "採用"], answer: 0, explanation: "【解析】辞职、离职叫「退職（たいしょく）」。" },
+        { emoji: "🎉👏", question: "良いことがあった時にすることは？", options: ["お見舞い", "お祝い", "お悔やみ"], answer: 1, explanation: "【解析】祝贺、庆祝叫「お祝い（おいわい）」。" }
+
+    ];
+
+    const grammarQuizData = [
+        { question: "上司の説明を理解した時、自然な返事は？", options: ["知りました", "分かりました", "分かります"], answer: 1, explanation: "【解析】中文的“知道了”在日语中通常翻译为「分かりました」。" },
+        { question: "明日、電車（ ）乗って出張に行きます。", options: ["を", "で", "に"], answer: 2, explanation: "【解析】乘坐交通工具时，表示附着点的助词要用「に」（如：電車に乗る）。" },
+        { question: "職場で先に帰る同僚に対してかける言葉は？", options: ["ご苦労様でした", "お疲れ様でした", "さようなら"], answer: 1, explanation: "【解析】「お疲れ様でした（辛苦了）」对任何人都适用。「ご苦労様でした」是上级对下级使用的。" },
+        { question: "風が吹いて、自動でドアが（ ）。", options: ["開けました", "開きました", "開いていました"], answer: 1, explanation: "【解析】门自然打开（自动词）用「開く」；人故意去开门（他动词）用「開ける」。" },
+        { question: "お客様の資料を（ ）。", options: ["見ます", "拝見します", "ご覧になります"], answer: 1, explanation: "【解析】看客户的资料时，要用自己的谦让语「拝見（はいけん）します」。「ご覧になる」是尊他语，指客户看。" },
+        { question: "相手に許可を求める時の正しい言い方は？", options: ["～してもよろしいでしょうか", "～してください", "～するべきですか"], answer: 0, explanation: "【解析】询问是否可以做某事时，最礼貌的说法是「～してもよろしいでしょうか（可以...吗？）」。" },
+        { question: "「部長が私にお土産を（ ）。」", options: ["くれました", "あげました", "もらいました"], answer: 0, explanation: "【解析】别人给我东西用「くれました」。如果用「もらいました」，主语必须是“我”。" },
+        { question: "お客様が会社に（ ）。", options: ["参りました", "いらっしゃいました", "行きました"], answer: 1, explanation: "【解析】客户来公司，要用尊他语「いらっしゃいました」。「参りました」是自己去的谦让语。" },
+        { question: "謝る時のビジネス用語として正しいのは？", options: ["ごめんなさい", "すみません", "申し訳ございません"], answer: 2, explanation: "【解析】在商务场合，最正式、礼貌的道歉用语是「申し訳ございません」。" },
+        { question: "「資料を（ ）ので、ご確認ください。」", options: ["送ります", "お送りします", "送らせます"], answer: 1, explanation: "【解析】自己发送资料给对方，为了表示敬意，使用谦让语「お送りします」。" },
+        { question: "上司に「この件、知っていますか？」と聞きたい時", options: ["ご存知ですか", "知っていますか", "お分かりですか"], answer: 0, explanation: "【解析】询问上级是否知道某事，要用「知っている」的尊他语「ご存知（ぞんじ）ですか」。" },
+        { question: "依頼する時のクッション言葉は？", options: ["恐れ入りますが", "残念ですが", "申し訳ありませんが"], answer: 0, explanation: "【解析】麻烦别人做某事之前，常用的缓冲用语是「恐れ入りますが（不好意思，劳驾您……）」。" },
+// --- ここから追加分（前半44問: Q13〜Q56） ---
+        // 【敬語：尊敬語・謙譲語の使い分け】
+        { question: "お客様がそう（ ）。", options: ["おっしゃいました", "申しました", "言いました"], answer: 0, explanation: "【解析】「言う（说）」的尊他语是「おっしゃる」。表示客户说话时使用。「申す」是自己的谦让语。" },
+        { question: "社長、ゴルフを（ ）か。", options: ["します", "なさいます", "いたします"], answer: 1, explanation: "【解析】「する（做）」的尊他语是「なさる」。「いたします」是自己的谦让语。" },
+        { question: "私がお客様の荷物を（ ）。", options: ["お持ちします", "お持ちになります", "持たせます"], answer: 0, explanation: "【解析】「お/ご～する」是谦让语句型，表示自己为对方做某事。“我来帮您拿”是「お持ちします」。" },
+        { question: "お客様、こちらの席に（ ）。", options: ["座ってください", "お座りください", "座らせてください"], answer: 1, explanation: "【解析】「お/ご～ください」是尊敬的请求表达，请客户坐下用「お座りください」。" },
+        { question: "部長はすでに（ ）。", options: ["帰られました", "帰らせました", "お帰りしました"], answer: 0, explanation: "【解析】「帰る」的尊他语可以使用被动形式「帰られる」或「お帰りになる」。" },
+        { question: "お客様、この資料はもう（ ）か。", options: ["ご覧になりました", "拝見しました", "見られました"], answer: 0, explanation: "【解析】「見る（看）」的尊他语是「ご覧（らん）になる」。「拝見する」是自己的谦让语。" },
+        { question: "明日、私が御社へ（ ）。", options: ["伺います", "参られます", "いらっしゃいます"], answer: 0, explanation: "【解析】「行く（去）」的谦让语是「伺う（うかがう）」，表示去对方那里拜访。" },
+        { question: "お客様、お名前はなんと（ ）か。", options: ["おっしゃいます", "申します", "言われます"], answer: 0, explanation: "【解析】询问客户的名字，使用「言う」的尊他语「おっしゃる」。" },
+        { question: "（社内の人に聞く時）山田部長は（ ）か。", options: ["いらっしゃいます", "おります", "ございます"], answer: 0, explanation: "【解析】在公司内询问上司在不在，用「いる」的尊他语「いらっしゃいます」。" },
+        { question: "（電話で社外の人に）山田はただいま外出して（ ）。", options: ["いらっしゃいます", "おります", "ございます"], answer: 1, explanation: "【解析】日语有“内外”之分。对外部人员提到自己公司的上司时，不能用尊他语，必须用谦让语「おる」。" },
+
+        // 【助詞の使い分け】
+        { question: "10時に会議室（ ）集まってください。", options: ["に", "で", "を"], answer: 0, explanation: "【解析】表示集合、到达的目的地或附着点，助词用「に」。" },
+        { question: "駅の前（ ）タクシーを降りました。", options: ["で", "に", "を"], answer: 0, explanation: "【解析】表示动作发生的场所，助词用「で」（在车站前下车）。" },
+        { question: "黒いペン（ ）名前を書いてください。", options: ["で", "に", "を"], answer: 0, explanation: "【解析】表示使用的工具、手段，助词用「で」（用黑笔写）。" },
+        { question: "社長（ ）お土産をいただきました。", options: ["に", "を", "から"], answer: 2, explanation: "【解析】从别人那里得到某物，用「から」或「に」。这里「から（从）」最合适。" },
+        { question: "明日は大阪へ出張（ ）行きます。", options: ["を", "に", "で"], answer: 1, explanation: "【解析】表示移动的目的，用「名词+に行く」的句型（去出差）。" },
+        { question: "壁（ ）ポスターが貼ってあります。", options: ["で", "に", "を"], answer: 1, explanation: "【解析】表示某物存在的附着点，助词用「に」（贴在墙上）。" },
+        { question: "毎日、公園（ ）散歩します。", options: ["で", "を", "に"], answer: 1, explanation: "【解析】在某个空间内移动、穿过（如散步、飞、过桥），助词要用「を」。" },
+        { question: "昨日、日本（ ）来たばかりです。", options: ["で", "に", "を"], answer: 1, explanation: "【解析】表示到达的目的地，用「に」或「へ」（来到日本）。" },
+        { question: "このお酒は米（ ）作られています。", options: ["から", "で", "に"], answer: 0, explanation: "【解析】表示看不出原貌的原料时用「から」（用米酿造），能看出材料的用「で」。" },
+        { question: "風邪（ ）会社を休みました。", options: ["に", "で", "を"], answer: 1, explanation: "【解析】表示原因、理由，助词用「で」（因为感冒而请假）。" },
+
+        // 【自動詞・他動詞の使い分け】
+        { question: "電気が（ ）いますね。誰がつけたんでしょう。", options: ["つけて", "ついて", "つかせて"], answer: 1, explanation: "【解析】描述灯亮着的状态，使用自动词「つく（ついています）」。" },
+        { question: "暗いので、私が電気を（ ）おきました。", options: ["ついて", "つけて", "つかって"], answer: 1, explanation: "【解析】人为地去开灯，使用他动词「つける」。" },
+        { question: "あっ、コップが（ ）しまいました！", options: ["割って", "割れて", "割らせて"], answer: 1, explanation: "【解析】杯子碎了（自然发生或结果），使用自动词「割れる」。" },
+        { question: "すみません、私がコップを（ ）しまいました。", options: ["割って", "割れて", "割らせて"], answer: 0, explanation: "【解析】我把杯子打碎了（人为动作），使用他动词「割る」。" },
+        { question: "来週の会議の予定が（ ）。", options: ["決まりました", "決めました", "決定しました"], answer: 0, explanation: "【解析】日程定下来了（状态结果），使用自动词「決まる」。" },
+        { question: "私が来週の会議の時間を（ ）。", options: ["決まりました", "決めました", "決まりさせて"], answer: 1, explanation: "【解析】我来决定时间（人为动作），使用他动词「決める」。" },
+        { question: "蛇口から水が（ ）いますよ。", options: ["出て", "出して", "出されて"], answer: 0, explanation: "【解析】水流出来的状态，使用自动词「出る」。" },
+        { question: "うっかり駅で財布を（ ）しまいました。", options: ["落ちて", "落として", "落ちらせて"], answer: 1, explanation: "【解析】我把钱包弄丢了，使用他动词「落とす」。" },
+        { question: "道にお金が（ ）います。", options: ["落ちて", "落として", "落とされて"], answer: 0, explanation: "【解析】钱掉在地上（状态），使用自动词「落ちる」。" },
+        { question: "風でろうそくの火が（ ）。", options: ["消しました", "消えました", "消えさせました"], answer: 1, explanation: "【解析】火自然熄灭，使用自动词「消える」。人去灭火则是「消す」。" },
+
+        // 【ビジネスの相槌・フレーズ・ニュアンス】
+        { question: "上司「これ、明日までに頼むね。」\n部下「はい、（ ）。」", options: ["承知いたしました", "知りました", "了解です"], answer: 0, explanation: "【解析】对上级表示“明白了”，最规范的是「承知（しょうち）いたしました」。「了解です」只能对同级或下级说。" },
+        { question: "取引先「すみません、10分ほど遅れます。」\nあなた「（ ）。」", options: ["かまいません", "気にしないで", "承知いたしました。お待ちしております"], answer: 2, explanation: "【解析】商务场合回应对方的迟到或道歉，应该用礼貌的「承知いたしました」并表示等待。前两项过于随意。" },
+        { question: "「今、お時間よろしいでしょうか。」\n「はい、（ ）。」", options: ["なんですか", "何でしょうか", "何のことですか"], answer: 1, explanation: "【解析】回应“现在有时间吗？”，用礼貌的「何でしょうか（什么事？）」。" },
+        { question: "会議で相手の意見に賛成する時", options: ["私もそう思います", "私はそう思います", "私がそうです"], answer: 0, explanation: "【解析】表达赞同，“我也这么认为”是「私もそう思います」。" },
+        { question: "ビジネスで、相手の話を聞いている時の自然な相槌は？", options: ["はい、はい、はい", "はい、ええ", "うん、うん"], answer: 1, explanation: "【解析】商务场合倾听时，适度地点头说「はい」或「ええ」最好。连说三个「はい」会显得不耐烦，「うん」太随便。" },
+        { question: "（ ）、本日はよろしくお願いいたします。", options: ["それでは", "ではでは", "じゃあ"], answer: 0, explanation: "【解析】“那么，今天请多关照”，商务场合的“那么”应该用正式的「それでは」。" },
+        { question: "分からないことを丁寧に聞く時", options: ["すみません、教えてください", "すみません、教えてあげますか", "すみません、教えていただけませんか"], answer: 2, explanation: "【解析】请求别人教自己，最礼貌的说法是「教えていただけませんか（能请您教我吗？）」。" },
+        { question: "エレベーターで、他の人に先に乗ってもらう時", options: ["どうぞ", "お先に", "すみません"], answer: 0, explanation: "【解析】让别人先走或先做某事，说「どうぞ（请）」。" },
+        { question: "お客様の会社や、誰かの家に入室する時の挨拶", options: ["お邪魔します", "いらっしゃいませ", "ごめんください"], answer: 0, explanation: "【解析】进入别人的办公室或家里，要说「失礼します」或「お邪魔（じゃま）します（打扰了）」。" },
+        { question: "仕事を終えて帰る人に、オフィスに残る人がかける言葉", options: ["お疲れ様です", "お疲れ様でした", "ご苦労様でした"], answer: 1, explanation: "【解析】对已经下班要回家的人，动作已完成，所以用过去式「お疲れ様でした」。" },
+        { question: "いつもお世話に（ ）。", options: ["なっております", "しています", "なります"], answer: 0, explanation: "【解析】商务邮件或开场的固定寒暄：“一直承蒙您的关照”，必须用「なっております」。" },
+        { question: "今後ともよろしくお願い（ ）。", options: ["いたします", "します", "されます"], answer: 0, explanation: "【解析】“请多关照”的礼貌升级版，用谦让语「いたします」。" },
+        { question: "大変申し訳（ ）。", options: ["ございません", "ありません", "ないです"], answer: 0, explanation: "【解析】最正式的道歉是「申し訳ございません」。" },
+        { question: "お手数ですが、ご確認の（ ）よろしくお願いいたします。", options: ["ほど", "こと", "さ"], answer: 0, explanation: "【解析】「～のほど」是商务日语中常用的缓冲词，使语气更委婉柔和（请您确认……）。" },
+// --- ここから追加分（残り44問: Q57〜Q100） ---
+        // 【電話・メールの定番フレーズ】
+        { question: "電話に出る時の正しい名乗り方は？\n(接电话时的正确自报家门方式是？)", options: ["です", "であります", "でございます"], answer: 2, explanation: "【解析】在商务电话中，表示“我是/这里是……”时，使用最礼貌的「でございます」。" },
+        { question: "電話で相手の名前を聞く時\n(在电话里询问对方名字时)", options: ["だれ様でしょうか", "どの様でしょうか", "どちら様でしょうか"], answer: 2, explanation: "【解析】询问对方“您是哪位？”时，商务日语固定说法是「どちら様でしょうか」。绝对不能用「だれ」。" },
+        { question: "電話を切る時の挨拶\n(挂断电话时的寒暄语)", options: ["さようなら", "失礼いたします", "お元気で"], answer: 1, explanation: "【解析】挂电话时不能说「さようなら」，必须说「失礼（しつれい）いたします」。" },
+        { question: "ビジネスメールの最初の挨拶\n(商务邮件开头的寒暄)", options: ["いつもお世話になっております", "大変お世話になっております", "どちらも正しい"], answer: 2, explanation: "【解析】「いつも～」和「大変～」都可以，是最常见的邮件开场白。" },
+        { question: "メールで添付ファイルを見てもらう時\n(请对方查看附件时)", options: ["見てください", "拝見してください", "ご確認ください"], answer: 2, explanation: "【解析】请对方确认用「ご確認ください」。「拝見する」是自己的谦让语，不能要求对方做。" },
+        { question: "メールの最後で返信を待っていることを伝える時\n(邮件末尾表达期待回复时)", options: ["お待ちしております", "待たせております", "お持ちしております"], answer: 0, explanation: "【解析】“期待您的回复”固定说法是「ご返信お待ちしております」。" },
+        { question: "社外の人に送るメールの宛名として正しいのは？\n(发给外部人员的邮件，称呼正确的是？)", options: ["山田様", "山田さん", "山田殿"], answer: 0, explanation: "【解析】对外部客户必须用「様（さま）」。「殿（どの）」通常用于公文或上对下。" },
+        { question: "自分の会社のことをへりくだって言う言葉は？\n(谦称自己公司的词是？)", options: ["御社（おんしゃ）", "弊社（へいしゃ）", "貴社（きしゃ）"], answer: 1, explanation: "【解析】谦称自己的公司叫「弊社（へいしゃ）」。" },
+        { question: "相手の会社のことを「メールや文書」で書く時は？\n(在“邮件或文书”中尊称对方公司时)", options: ["御社（おんしゃ）", "弊社（へいしゃ）", "貴社（きしゃ）"], answer: 2, explanation: "【解析】书面语尊称对方公司用「貴社（きしゃ）」，口语对话中用「御社（おんしゃ）」。" },
+        
+        // 【クッション言葉（缓冲语）】
+        { question: "頼み事をする時のクッション言葉\n(拜托别人时的缓冲语)", options: ["お手数をおかけしますが", "ごめんなさいですが", "面倒ですが"], answer: 0, explanation: "【解析】“给您添麻烦了，但还是拜托您……”固定用「お手数（てすう）をおかけしますが」。" },
+        { question: "相手の提案を断る時のクッション言葉\n(拒绝对方提议时的缓冲语)", options: ["せっかくですが", "どうしても", "残念ながら"], answer: 0, explanation: "【解析】“难得您提出……（但还是拒绝）”用「せっかくですが」最能照顾对方感受。" },
+        { question: "人に道を尋ねたり、質問する時のクッション言葉\n(问路或提问时的缓冲语)", options: ["恐れ入りますが", "失礼ですが", "どちらも正しい"], answer: 2, explanation: "【解析】「恐れ入りますが」和「失礼ですが」都可以用作“不好意思打扰一下”的缓冲词。" },
+        { question: "連絡が遅くなった時の謝罪\n(联络迟了时的道歉)", options: ["遅くなりまして", "遅くて", "遅れて"], answer: 0, explanation: "【解析】“联络晚了非常抱歉”是「ご連絡が遅くなりまして、申し訳ございません」。" },
+        { question: "相手の都合を聞く時\n(询问对方时间是否方便时)", options: ["いかがでしょうか", "どうでしょうか", "いいでしょうか"], answer: 0, explanation: "【解析】询问“您意下如何/方便吗？”用最礼貌的「いかがでしょうか」。" },
+        { question: "「差し支えなければ、～」に続く言葉は？\n(“如果不方便的话……”后面接什么？)", options: ["お名前を教えてください", "すぐに来てください", "絶対にやってください"], answer: 0, explanation: "【解析】「差し支えなければ（如果不介意的话）」后面接委婉的请求。" },
+        { question: "確認のために、もう一度聞く時の言葉\n(为了确认再问一次时的铺垫)", options: ["念のため", "絶対", "たぶん"], answer: 0, explanation: "【解析】“以防万一确认一下”叫「念（ねん）のため」。" },
+        { question: "相手がすぐに対応してくれた時のお礼\n(感谢对方迅速处理)", options: ["早急にご対応いただき", "早急にしていただき", "早急にやりいただき"], answer: 0, explanation: "【解析】“感谢您的迅速应对”是「早急（さっきゅう）にご対応いただき、ありがとうございます」。" },
+        { question: "迷惑をかけた時の謝罪\n(给人添麻烦时的道歉)", options: ["ご迷惑をおかけして", "ご迷惑をかけて", "ご迷惑をして"], answer: 0, explanation: "【解析】“添麻烦”的固定搭配是「迷惑をかける」，自谦语变为「おかけする」。" },
+        { question: "相手に許可を求める時\n(请求对方许可时)", options: ["よろしいでしょうか", "いいですか", "かまいませんか"], answer: 0, explanation: "【解析】最礼貌的请求许可是「～してもよろしいでしょうか」。" },
+        
+        // 【行動の表現と敬語】
+        { question: "お客様が会社に来た時の社内での報告\n(客户来公司时向内部报告)", options: ["お客様が来ました", "お客様が参りました", "お客様がお見えになりました"], answer: 2, explanation: "【解析】「来る」的高级尊他语是「お見えになる」或「お越しになる」。" },
+        { question: "「山田はただいま席を（ ）おります。」\n(山田现在不在座位上)", options: ["外して", "離れて", "出て"], answer: 0, explanation: "【解析】“离开座位（稍后回来）”在商务日语中固定说「席を外（はず）す」。" },
+        { question: "お客様を応接室に案内する時\n(引导客户去会客室时)", options: ["ご案内いたします", "案内してあげます", "案内になります"], answer: 0, explanation: "【解析】“我来为您带路”用谦让语「ご～する」，即「ご案内いたします」。" },
+        { question: "相手の言葉を引用して同意する時\n(引用对方的话表示同意时)", options: ["おっしゃる通りです", "言う通りです", "申す通りです"], answer: 0, explanation: "【解析】“正如您所说”用「言う」的尊他语「おっしゃる通りです」。" },
+        { question: "会議で自分の意見を言う時\n(在会议上表达自己的意见时)", options: ["私はこう考えております", "私はこう思っています", "私はこう存じます"], answer: 0, explanation: "【解析】“我是这样考虑的”，使用谦让表达「考えております」。" },
+        { question: "上司に「その件について聞きましたか？」と尋ねる時\n(问上司“听说那件事了吗？”)", options: ["お聞きになりましたか", "聞きましたか", "伺いましたか"], answer: 0, explanation: "【解析】询问上司的行为用尊他语「お聞きになりましたか」。「伺う」是自己“听”的谦让语。" },
+        
+        // 【助詞・文法ニュアンス】
+        { question: "「会議（ ）始まります。」\n(会议要开始了)", options: ["が", "を", "に"], answer: 0, explanation: "【解析】「始まる」是自动词，前面用「が」（会议自己开始）。" },
+        { question: "「それでは、会議（ ）始めます。」\n(那么，我们开始开会吧)", options: ["が", "を", "に"], answer: 1, explanation: "【解析】「始める」是他动词，前面用「を」（人去开始会议）。" },
+        { question: "「３人（ ）１チームです。」\n(3个人组成1队)", options: ["で", "に", "と"], answer: 0, explanation: "【解析】表示数量、范围的限定或单位基准，用助词「で」。" },
+        { question: "「パソコン（ ）壊れました。」\n(电脑坏了)", options: ["が", "を", "に"], answer: 0, explanation: "【解析】发生某种客观状态的变化，主语后用「が」。「壊れる」是自动词。" },
+        { question: "「窓が（ ）います。」\n(窗户开着)", options: ["開いて", "開けて", "開かせて"], answer: 0, explanation: "【解析】描述目前的状态，用“自动词+ている”（開いている）。" },
+        { question: "「壁にカレンダーが（ ）あります。」\n(墙上挂着日历)", options: ["掛けて", "掛かって", "掛かり"], answer: 0, explanation: "【解析】描述人为动作留下的结果状态，用“他动词+てある”（掛けてある）。" },
+        { question: "「ドアに鍵が（ ）います。」\n(门锁着)", options: ["かかって", "かけて", "かかり"], answer: 0, explanation: "【解析】描述自然状态，用“自动词+ている”（鍵がかかっている）。" },
+        { question: "「先輩が仕事を（ ）。」\n(前辈帮我工作)", options: ["手伝ってくれました", "手伝ってもらいました", "手伝ってあげました"], answer: 0, explanation: "【解析】别人主动为我做某事，主语是别人，用「～てくれる」。" },
+        { question: "「私は先輩に仕事を（ ）。」\n(我请前辈帮忙工作)", options: ["手伝ってくれました", "手伝ってもらいました", "手伝ってあげました"], answer: 1, explanation: "【解析】我受到别人的恩惠，主语是我，用「～てもらう」。" },
+        
+        // 【ビジネス頻出用語まとめ】
+        { question: "「予定が（ ）いる。」\n(日程排得很满)", options: ["詰まって", "混んで", "多くて"], answer: 0, explanation: "【解析】形容日程满满当当，没有空隙，日语惯用说「予定が詰まる」。" },
+        { question: "「締め切りに（ ）。」\n(赶得上截止日期)", options: ["間に合う", "追いつく", "入る"], answer: 0, explanation: "【解析】赶得上时间、期限，固定搭配是「間に合う」。" },
+        { question: "「会議が（ ）。」\n(会议拖长了)", options: ["長引く", "長くなる", "延長する"], answer: 0, explanation: "【解析】会议或事情拖延的时间比预想的长，常用动词「長引く（ながびく）」。" },
+        { question: "「電話をしたが、連絡が（ ）。」\n(打了电话，但联系不上)", options: ["つかない", "とれない", "どちらも正しい"], answer: 2, explanation: "【解析】联系不上既可以说「連絡がつかない」，也可以说「連絡がとれない」。" },
+        { question: "「明日はお休みを（ ）。」\n(明天我请假)", options: ["いただきます", "もらいます", "あげます"], answer: 0, explanation: "【解析】向公司请假，用「もらう」的谦让语「いただく」，即“从公司得到假期”。" },
+        { question: "「これで（ ）でしょうか。」\n(这样可以吗？)", options: ["よろしい", "いい", "だいじょうぶ"], answer: 0, explanation: "【解析】「いいですか」的礼貌说法是「よろしいでしょうか」。" },
+        { question: "「私が（ ）お伝えします。」\n(我代为转达)", options: ["代わりに", "代表に", "交代に"], answer: 0, explanation: "【解析】代替别人做某事，用「代わりに（かわりに）」。" },
+        { question: "「（ ）問題ありません。」\n(目前没问题)", options: ["今のところ", "今の時間", "今の場所"], answer: 0, explanation: "【解析】“目前、现阶段”在日语中习惯说「今のところ」。" },
+        { question: "「本日の会議はこれで（ ）。」\n(今天的会议到此结束)", options: ["終了いたします", "終わります", "どちらも正しい"], answer: 2, explanation: "【解析】两者都可以，但「終了（しゅうりょう）いたします」在商务场合更正式。" },
+        { question: "「引き続き、よろしく（ ）。」\n(今后也请多关照)", options: ["お願い申し上げます", "お願いします", "どちらも正しい"], answer: 2, explanation: "【解析】两者都对，但在邮件末尾或正式场合，「お願い申し上げます」更显敬意。" }
+    ];
+
+    let currentSessionData = [];
+    let currentQuizName = "";
+    let currentQuestionIndex = 0;
+    let score = 0;
+
+    // --- DOM取得 ---
+    const screens = { top: document.getElementById('top-screen'), quiz: document.getElementById('quiz-screen'), result: document.getElementById('result-screen') };
+    const ui = {
+        btnEmoji: document.getElementById('btn-start-emoji'), btnGrammar: document.getElementById('btn-start-grammar'),
+        nextBtn: document.getElementById('next-btn'), restartBtn: document.getElementById('restart-btn'),
+        progressText: document.getElementById('progress-text'), emojiDisplay: document.getElementById('emoji-display'),
+        questionText: document.getElementById('question-text'), optionsContainer: document.getElementById('options-container'),
+        feedback: document.getElementById('feedback'), feedbackTitle: document.getElementById('feedback-title'),
+        feedbackText: document.getElementById('feedback-text'), scoreText: document.getElementById('score-text'),
+        resultMessage: document.getElementById('result-message'), historyList: document.getElementById('history-list')
+    };
+
+    // --- 履歴機能 ---
+    function loadHistory() {
+        const history = JSON.parse(localStorage.getItem('quizHistory2')) || [];
+        ui.historyList.innerHTML = '';
+        if (history.length > 0) {
+            history.slice(-5).reverse().forEach(record => {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `<span><span class="tag">${record.type}</span>${record.date}</span> <span>⭐ ${record.score}/${record.total}点</span>`;
+                ui.historyList.appendChild(div);
+            });
+        } else {
+            ui.historyList.innerHTML = '<p style="font-size: 0.9rem; color: #7f8c8d;">まだ記録がありません。 / 暂无记录</p>';
+        }
+    }
+    function saveHistory(finalScore, total, typeName) {
+        const history = JSON.parse(localStorage.getItem('quizHistory2')) || [];
+        const today = new Date();
+        const dateString = `${today.getMonth()+1}/${today.getDate()} ${today.getHours()}:${String(today.getMinutes()).padStart(2, '0')}`;
+        history.push({ date: dateString, score: finalScore, total: total, type: typeName });
+        localStorage.setItem('quizHistory2', JSON.stringify(history));
+    }
+
+    // --- イベントリスナー ---
+    ui.btnEmoji.addEventListener('click', () => startQuiz(emojiQuizData, "絵文字"));
+    ui.btnGrammar.addEventListener('click', () => startQuiz(grammarQuizData, "文法"));
+    
+    ui.restartBtn.addEventListener('click', () => {
+        screens.result.classList.add('hidden');
+        screens.top.classList.remove('hidden');
+        loadHistory();
+    });
+    
+    ui.nextBtn.addEventListener('click', () => {
+        currentQuestionIndex++;
+        if (currentQuestionIndex < currentSessionData.length) {
+            showQuestion();
+        } else {
+            showResult();
+        }
+    });
+
+    // --- クイズロジック ---
+    function startQuiz(sourceData, name) {
+        // 1. ラジオボタンから選択された出題数を取得
+        const countRadios = document.getElementsByName('q-count');
+        let selectedCount = 10;
+        for (let radio of countRadios) {
+            if (radio.checked) { selectedCount = parseInt(radio.value); break; }
+        }
+
+        // 2. 配列をシャッフル（ランダム化）する処理
+        let shuffled = [...sourceData];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+
+        // 3. 選択された数だけ問題を切り出す（※問題数が足りない場合は最大数にする）
+        const actualCount = Math.min(selectedCount, shuffled.length);
+        currentSessionData = shuffled.slice(0, actualCount);
+        
+        currentQuizName = name;
+        currentQuestionIndex = 0; 
+        score = 0;
+        
+        screens.top.classList.add('hidden');
+        screens.quiz.classList.remove('hidden');
+        showQuestion();
+    }
+
+    function showQuestion() {
+        const q = currentSessionData[currentQuestionIndex];
+        ui.progressText.innerText = `【${currentQuizName}】 問題 ${currentQuestionIndex + 1} / ${currentSessionData.length}`;
+        
+        if (q.emoji) {
+            ui.emojiDisplay.innerText = q.emoji;
+            ui.emojiDisplay.classList.remove('hidden');
+        } else {
+            ui.emojiDisplay.classList.add('hidden');
+        }
+
+        ui.questionText.innerText = q.question;
+        ui.optionsContainer.innerHTML = '';
+        ui.feedback.style.display = 'none';
+
+        q.options.forEach((option, index) => {
+            const btn = document.createElement('button');
+            btn.innerText = option;
+            btn.classList.add('btn');
+            btn.addEventListener('click', () => {
+                const allBtns = ui.optionsContainer.querySelectorAll('.btn');
+                allBtns.forEach(b => b.disabled = true);
+                
+                if (index === q.answer) {
+                    btn.classList.add('correct-btn');
+                    score++;
+                    ui.feedbackTitle.innerText = "⭕️ 正解！ (正确)";
+                    ui.feedbackTitle.style.color = "#27ae60";
+                    ui.feedback.className = "correct";
+                } else {
+                    btn.classList.add('wrong-btn');
+                    allBtns[q.answer].classList.add('correct-btn');
+                    ui.feedbackTitle.innerText = "❌ 残念！ (错误)";
+                    ui.feedbackTitle.style.color = "#c0392b";
+                    ui.feedback.className = "wrong";
+                }
+                ui.feedbackText.innerText = q.explanation;
+                ui.feedback.style.display = 'block';
+            });
+            ui.optionsContainer.appendChild(btn);
+        });
+    }
+
+    function showResult() {
+        screens.quiz.classList.add('hidden');
+        screens.result.classList.remove('hidden');
+        ui.scoreText.innerText = `${currentSessionData.length}問中 ${score}問 正解！`;
+        
+        if (score === currentSessionData.length) {
+            ui.resultMessage.innerText = "素晴らしい！完璧です✨ (太棒了！完美！)";
+        } else {
+            ui.resultMessage.innerText = "解説を読んで復習しましょう！ (看看解析复习一下吧！)";
+        }
+        
+        saveHistory(score, currentSessionData.length, currentQuizName);
+    }
+
+    // 初期ロード
+    loadHistory();
+</script>
+
+</body>
+</html>
